@@ -1,0 +1,26 @@
+# Quick Test Configuration
+# Fast experiments for testing/debugging
+
+experiment_name: "dp_models_quick_test"
+dataset: "mnist"
+
+architectures:
+  - "cvae"
+
+sigma_values:
+  - 0.0   # No DP
+  - 0.1   # Light DP
+
+# Minimal training for quick results
+vae_epochs: 20
+gan_epochs: 50
+n_per_class: 5
+
+# MLflow configuration
+mlflow_uri: "file:./mlruns"
+
+# Quick evaluation
+force_retrain: false
+save_artifacts: false
+samples_per_class: 100
+utility_epochs: 10 

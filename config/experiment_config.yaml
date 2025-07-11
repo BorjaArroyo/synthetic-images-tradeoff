@@ -1,0 +1,70 @@
+# Comprehensive Test Configuration - 3 Datasets + Diffusion + Fixed Privacy Estimation
+experiment_name: "dp_models_octmnist_isomap_knn_3seeds"
+dataset: "octmnist"
+n_seeds: 3
+
+# All three architectures including diffusion
+architectures:
+  # - "cvae"
+  - "cgan"
+  # - "diffusion"
+
+# Focus on the most important sigma values for comprehensive comparison
+sigma_values:
+  - 0.00  # Baseline (no privacy)
+  # - 0.05  # Low noise
+  # - 0.10  # Medium-low noise
+  # - 0.15  # Medium noise (was problematic)
+  # - 0.20  # Medium-high noise
+  # - 0.25  # High noise (was very problematic)
+  # - 0.30  # Very high noise (was failing)
+  # - 0.35
+  # - 0.40
+
+# Training parameters - aligned with proven approaches
+vae_epochs: 10000     # Reasonable for CVAEs
+gan_epochs: 10000     # CGANs need more epochs  
+diffusion_epochs: 10000 
+n_per_class: 10      # Training samples per class
+
+# MLflow configuration
+mlflow_uri: "file:./mlruns"
+
+# Fixed privacy evaluation settings (our successful non-parametric approach)
+privacy_reducer: "isomap"        # With n_neighbors=15 (fixed)
+privacy_density_method: "knn"    # With k=10 (fixed and stable)
+enable_plotting: true
+
+# Behavior settings
+force_retrain: true  # Reuse existing models when possible
+save_artifacts: true  # Save model artifacts and plots
+
+# Evaluation settings
+samples_per_class: 100  # For synthetic data generation
+utility_epochs: 100      # For utility classifier training
+
+# Training hyperparameters
+batch_size: 64          # Default batch size for training
+learning_rate: 0.0001   # Default learning rate for training (1e-4)
+
+# Privacy evaluation configuration (only for methods being used)
+# Current settings: privacy_reducer: umap, privacy_density_method: kde
+# For other reducer/density method configs, see README.md
+
+reducer_config:
+  isomap:
+    n_components: 2
+    n_neighbors: 15
+    eigen_solver: auto
+    path_method: auto
+
+density_config:
+  knn:
+    k: 20
+    metric: euclidean
+
+# Datasets to test (will be run separately)
+# This config will be used as template for:
+# - mnist
+# - pathmnist  
+# - organamnist 
