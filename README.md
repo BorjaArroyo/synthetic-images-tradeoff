@@ -2,17 +2,71 @@
 
 This project analyzes the privacy-utility-fidelity tradeoffs in synthetic image generation using various generative models (CVAEs, CGANs, Diffusion Models) with differential privacy.
 
-## Quick Start
+## Installation
+
+### Prerequisites
+
+- Python 3.8 or higher
+- CUDA-compatible GPU (recommended)
+- 8GB+ RAM
+- 5GB+ disk space
+
+### Method 1: Using pip (Recommended)
 
 ```bash
+# Clone the repository
+git clone https://github.com/BorjaArroyo/synthetic-images-tradeoff.git
+cd synthetic-images-tradeoff
+
+# Create a virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
 # Install dependencies
 pip install -r requirements.txt
 
-# Run quick test
+# Install the package in development mode
+pip install -e .
+```
+
+### Method 2: Using pyproject.toml
+
+```bash
+# Clone the repository
+git clone https://github.com/BorjaArroyo/synthetic-images-tradeoff.git
+cd synthetic-images-tradeoff
+
+# Create a virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install with pip
+pip install .
+```
+
+### Verification
+
+Test your installation:
+
+```bash
+# Verify imports work
+python -c "import src; print('✅ Installation successful')"
+
+# Test quick configuration
+python run_experiments.py --config config/quick_test.yaml
+```
+
+## Quick Start
+
+```bash
+# Run quick test (minimal epochs for testing)
 python run_experiments.py --config config/quick_test.yaml
 
-# Run full experiment
+# Run full experiment (takes longer)
 python run_experiments.py --config config/experiment_config.yaml
+
+# Run with specific parameters
+python run_experiments.py --arch cvae --dataset mnist --sigmas 0.0,0.1,0.2
 ```
 
 ## Configuration
@@ -190,12 +244,59 @@ Results are logged to MLflow and saved in the `mlruns/` directory. Key outputs:
 - Synthetic image grids
 - GradCAM analysis
 
+## Troubleshooting
+
+### Common Issues
+
+#### Import Errors
+```bash
+# If you get import errors, make sure the package is installed
+pip install -e .
+
+# Or add the project to your Python path
+export PYTHONPATH="${PYTHONPATH}:/path/to/synthetic-images-tradeoff"
+```
+
+#### CUDA Issues
+```bash
+# Check CUDA availability
+python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
+
+# If CUDA is not available, experiments will run on CPU (much slower)
+```
+
+#### Memory Issues
+```bash
+# If you run out of memory, try:
+# 1. Reduce batch_size in config files
+# 2. Use smaller datasets
+# 3. Reduce samples_per_class
+```
+
+#### MLflow Issues
+```bash
+# If MLflow UI doesn't start:
+mlflow ui --backend-store-uri file://$(pwd)/mlruns
+
+# Clear MLflow cache if needed
+rm -rf mlruns/
+```
+
+### Performance Tips
+
+- **GPU Usage**: Ensure CUDA is available for faster training
+- **Memory**: Use smaller batch sizes if running out of memory
+- **Storage**: Experiments can generate large files; ensure sufficient disk space
+- **Parallel Processing**: The framework uses multiple workers for data loading
+
 ## Dependencies
 
 See `requirements.txt` for full list. Key dependencies:
-- PyTorch
-- MLflow
-- scikit-learn
-- UMAP
-- matplotlib
-- seaborn
+- PyTorch 2.7.1
+- MLflow 2.22.1
+- scikit-learn 1.7.0
+- UMAP 0.5.9
+- matplotlib 3.10.3
+- seaborn 0.13.2
+- OpenCV 4.11.0
+- NumPy 2.3.0

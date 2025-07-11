@@ -1,29 +1,52 @@
 # Core ML framework
-torch>=2.0.0
-torchvision>=0.15.0
-torchaudio>=0.11.0
+torch==2.7.1
+torchvision==0.22.1
+torchaudio==2.7.1
 
 # Differential Privacy
-opacus>=1.4.0
+opacus==1.5.4
 
 # Experiment tracking
-mlflow>=2.0.0
+mlflow==2.22.1
 
 # Data processing and datasets
-numpy>=1.21.0
-medmnist>=2.2.3
+numpy==2.3.0
+medmnist==3.0.2
 
 # Configuration management
-pyyaml>=6.0
+pyyaml==6.0.2
 
 # Visualization and metrics
-matplotlib>=3.5.0
-seaborn>=0.11.0
-scikit-learn>=1.0.0
+matplotlib==3.10.3
+seaborn==0.13.2
+scikit-learn==1.7.0
 
-# Fidelity metrics (optional, for advanced evaluation)
-torchmetrics>=0.11.0
-# lpips>=0.1.4
+# Image processing
+opencv-python==4.11.0.86
 
-# Privacy evaluation (optional, for advanced privacy metrics)
-# umap-learn>=0.5.0 
+# Progress bars
+tqdm==4.67.1
+
+# Scientific computing
+scipy==1.15.3
+
+# Fidelity metrics
+torchmetrics==1.7.2
+torch-fidelity==0.3.0
+
+# Utilities
+pillow==11.2.1
+pandas==2.2.3
+
+# GradCAM visualization
+grad-cam==1.5.5
+
+# Privacy evaluation - dimensionality reduction
+umap-learn==0.5.9.post2
+numba==0.61.2
+llvmlite==0.44.0
+pynndescent==0.5.13
+
+# Additional dependencies
+requests==2.32.4
+scikit-image==0.25.2 
