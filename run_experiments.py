@@ -50,6 +50,8 @@ from src.privacy.analysis import ecdf_distance_curves, compute_privacy_distance_
 from src.privacy.reducer_manager import get_reducer_manager
 from src.core.interfaces import DimensionalityReducer
 import math
+import json
+import os
 
 
 class ExperimentRunner:
@@ -986,9 +988,9 @@ class ExperimentRunner:
         # Load models for evaluation (whether from existing or newly trained)
         with mlflow.start_run(run_id=run_id):
             try:
-                full_model = mlflow.pytorch.load_model(f"runs:/{run_id}/full_model")
-                ablated_model = mlflow.pytorch.load_model(f"runs:/{run_id}/ablated_model") 
-                victim_model = mlflow.pytorch.load_model(f"runs:/{run_id}/victim_model")
+                full_model = self._load_model_optimized(run_id, "full_model")
+                ablated_model = self._load_model_optimized(run_id, "ablated_model") 
+                victim_model = self._load_model_optimized(run_id, "victim_model")
                 print("✅ Successfully loaded all 3 models")
             except Exception as e:
                 print(f"❌ Error loading models: {e}")
@@ -1156,6 +1158,118 @@ class ExperimentRunner:
             pass
         return None
     
+    def _save_model_optimized(self, model: torch.nn.Module, model_name: str, arch: str, 
+                             exclude_class: Optional[int], add_query: bool) -> None:
+        """Save model with size optimization using state dict and quantization."""
+        try:
+            # Get state dict
+            state_dict = model.state_dict()
+            
+            # Quantize to float16 (maintains good precision, 50% size reduction)
+            quantized_state_dict = {k: v.half() for k, v in state_dict.items()}
+            
+            # Save quantized state dict
+            state_dict_path = f"{model_name}_state_dict_fp16.pt"
+            torch.save(quantized_state_dict, state_dict_path)
+            mlflow.log_artifact(state_dict_path, f"{model_name}_state_dict_fp16.pt")
+            
+            # Save model metadata for reconstruction
+            model_metadata = {
+                'model_type': model_name,
+                'arch': arch,
+                'exclude_class': exclude_class,
+                'add_query': add_query,
+                'purpose': self._get_model_purpose(model_name),
+                'state_dict_keys': list(state_dict.keys()),
+                'original_dtype': str(next(state_dict.values()).dtype),
+                'quantized_dtype': 'float16',
+                'model_class': type(model).__name__,
+                'model_params': {
+                    'num_channels': self.dataset_config['num_channels'],
+                    'num_classes': self.dataset_config['num_classes'],
+                    'latent_dim': 128 if arch == 'cvae' else None,
+                    'timesteps': 400 if arch == 'diffusion' else None,
+                    'n_feat': 128 if arch == 'diffusion' else None,
+                    'drop_prob': 0.1 if arch == 'diffusion' else None,
+                    'latent_dim_gan': 100 if arch == 'cgan' else None,
+                    'img_shape': self.dataset_config['img_shape'] if arch == 'cgan' else None
+                }
+            }
+            mlflow.log_dict(model_metadata, f"{model_name}_metadata.json")
+            
+            # Clean up local file
+            if os.path.exists(state_dict_path):
+                os.remove(state_dict_path)
+                
+            print(f"✅ {model_name} saved as optimized state dict (FP16)")
+            
+        except Exception as e:
+            print(f"❌ Error saving optimized model {model_name}: {e}")
+            # Fallback to original method
+            mlflow.pytorch.log_model(model, model_name)
+            mlflow.log_dict({
+                'model_type': model_name,
+                'arch': arch,
+                'exclude_class': exclude_class,
+                'add_query': add_query,
+                'purpose': self._get_model_purpose(model_name)
+            }, f"{model_name}_metadata.json")
+            print(f"✅ {model_name} saved using fallback method")
+
+    def _load_model_optimized(self, run_id: str, model_name: str) -> torch.nn.Module:
+        """Load optimized model from MLflow."""
+        try:
+            # Download and load state dict
+            state_dict_path = mlflow.download_artifacts(f"runs:/{run_id}/{model_name}_state_dict_fp16.pt")
+            state_dict = torch.load(state_dict_path, map_location=self.device)
+            
+            # Convert back to float32 for inference
+            state_dict = {k: v.float() for k, v in state_dict.items()}
+            
+            # Download metadata to get model parameters
+            metadata_path = mlflow.download_artifacts(f"runs:/{run_id}/{model_name}_metadata.json")
+            with open(metadata_path, 'r') as f:
+                metadata = json.load(f)
+            
+            # Reconstruct model based on architecture
+            arch = metadata['arch']
+            model_params = metadata['model_params']
+            
+            if arch == 'cvae':
+                model = VAE(
+                    num_channels=model_params['num_channels'],
+                    latent_dim=model_params['latent_dim'],
+                    num_classes=model_params['num_classes']
+                ).to(self.device)
+            elif arch == 'diffusion':
+                model = DiffusionModel(
+                    num_channels=model_params['num_channels'],
+                    num_classes=model_params['num_classes'],
+                    timesteps=model_params['timesteps'],
+                    n_feat=model_params['n_feat'],
+                    drop_prob=model_params['drop_prob']
+                ).to(self.device)
+            elif arch == 'cgan':
+                model = Generator(
+                    latent_dim=model_params['latent_dim_gan'],
+                    num_classes=model_params['num_classes'],
+                    img_shape=model_params['img_shape']
+                ).to(self.device)
+            else:
+                raise ValueError(f"Unknown architecture: {arch}")
+            
+            # Load state dict
+            model.load_state_dict(state_dict)
+            model.eval()
+            
+            print(f"✅ Successfully loaded optimized {model_name}")
+            return model
+            
+        except Exception as e:
+            print(f"❌ Error loading optimized model {model_name}: {e}")
+            # Fallback to original method
+            return mlflow.pytorch.load_model(f"runs:/{run_id}/{model_name}")
+
     def _train_and_save_model(self, arch: str, sigma: float, epochs: int, n_per_class: int,
                              exclude_class: Optional[int], add_query: bool, model_name: str) -> torch.nn.Module:
         """Train a model and save it as an artifact in the current MLflow run."""
@@ -1251,17 +1365,8 @@ class ExperimentRunner:
         else:
             raise ValueError(f"Unknown architecture: {arch}")
         
-        # Save model with descriptive name
-        mlflow.pytorch.log_model(model, model_name)
-        
-        # Log model metadata
-        mlflow.log_dict({
-            'model_type': model_name,
-            'arch': arch,
-            'exclude_class': exclude_class,
-            'add_query': add_query,
-            'purpose': self._get_model_purpose(model_name)
-        }, f"{model_name}_metadata.json")
+        # Save model with size optimization
+        self._save_model_optimized(model, model_name, arch, exclude_class, add_query)
         
         print(f"✅ {model_name} training completed and saved")
         return model
